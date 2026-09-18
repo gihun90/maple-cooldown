@@ -727,6 +727,7 @@ class MirrorLoop:
         self._job = None
         self.idle = IdleDetector(cfg)
         self.idle_for = 0.0
+        self.black_frames = 0   # 맥에서 화면 기록 권한이 없으면 캡처가 전부 검게 나온다
         self.skills = ImageWindow(root, cfg, "mirror_pos", "  칸을 추가하세요  ", on_move)
         self.char = ImageWindow(root, cfg, "char_pos", "  캐릭터  ", on_move,
                                 is_round=lambda: cfg["char"]["round"])
@@ -742,6 +743,8 @@ class MirrorLoop:
         try:
             self.maple.refresh()
             skills_img, char_img, idle_img = compose_all(self.screen, self.cfg, self.maple, self.tracker)
+            if skills_img is not None:
+                self.black_frames = self.black_frames + 1 if skills_img.getextrema() == ((0, 0), (0, 0), (0, 0)) else 0
             self.skills.show(skills_img)
             if self.cfg["char"]["enabled"]:
                 self.char.show(char_img)
@@ -1297,6 +1300,8 @@ class ControlPanel:
         o = self.maple.origin
         win = f"메이플 창 찾음 ({o[0]}, {o[1]}) → 칸이 창을 따라감" if o else "메이플 창 없음 → 마지막 자리 그대로"
         win += f"  ·  캡처 {self.screen.backend()}"
+        if IS_MAC and self.mirror and self.mirror.black_frames > 15:
+            win = "캡처가 검게 나옵니다 → 시스템 설정 › 개인정보 보호 및 보안 › 화면 기록에서 이 앱을 허용하고 다시 켜주세요"
         head = f"스킬 칸 {n}개" if n else "스킬 칸 없음"
         self.status.configure(text=f"{head}  ·  {win}")
         idle_txt = ""

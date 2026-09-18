@@ -1,0 +1,54 @@
+name: build-mac
+
+# 맥 앱은 맥에서만 만들 수 있어서 GitHub의 맥 빌드 서버를 쓴다.
+# 실행 방법: Actions 탭 → build-mac → Run workflow → 릴리스 태그(예: v1.2) 입력.
+# 결과: 그 릴리스에 MapleSkillMirror-<tag>-mac-arm64.zip 이 붙는다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "zip을 붙일 릴리스 태그 (예: v1.2)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest   # Apple Silicon(arm64)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 라이브러리 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 앱 빌드
+        run: |
+          pyinstaller --noconfirm --onedir --windowed --name MapleSkillMirror \
+            --add-data "assets:assets" app.py
+          ls -la dist
+
+      - name: 임시 서명 (서명이 아예 없으면 Apple Silicon에서 실행이 막힌다)
+        run: codesign --force --deep --sign - dist/MapleSkillMirror.app
+
+      - name: zip으로 묶기
+        run: |
+          cd dist
+          ditto -c -k --keepParent MapleSkillMirror.app "MapleSkillMirror-${{ github.event.inputs.tag }}-mac-arm64.zip"
+          ls -la
+
+      - name: 릴리스에 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.inputs.tag }}" \
+            "dist/MapleSkillMirror-${{ github.event.inputs.tag }}-mac-arm64.zip" --clobber

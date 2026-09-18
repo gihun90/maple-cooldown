@@ -2,5 +2,6 @@ mss
 pillow
 numpy
 opencv-python-headless
-dxcam; sys_platform == "win32"
 pyinstaller
+dxcam; sys_platform == "win32"
+pyobjc-framework-Quartz; sys_platform == "darwin"

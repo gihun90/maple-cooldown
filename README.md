@@ -5,7 +5,7 @@
 
 - 화면에 보이는 것을 **캡처만** 합니다. 게임 메모리나 파일은 건드리지 않습니다 (OBS로 화면 녹화하는 것과 같은 원리).
 - 메이플은 **창모드**여야 합니다. 전체화면(exclusive)이면 캡처가 되지 않습니다.
-- 윈도우 전용. (맥 버전은 준비 중)
+- 윈도우, 맥(Apple Silicon) 지원. 메이플 Mac 버전(베타)에서도 동작합니다.
 
 ## 그냥 쓰기
 
@@ -14,6 +14,17 @@
 3. 처음 뜨는 윈도우 보안 경고는 서명 안 된 개인 제작 프로그램이라 뜨는 것입니다. **추가 정보 → 실행**.
 
 > exe 한 개로 묶은 버전은 윈도우 디펜더가 `Wacatac.B!ml`(머신러닝 추측)로 오탐해서 폴더 형태로 배포합니다. 코드는 이 저장소에 전부 공개돼 있고, 못 믿겠으면 아래 "직접 빌드하기"로 본인 PC에서 만들면 됩니다.
+
+## 맥에서 쓰기
+
+1. **Releases**에서 `MapleSkillMirror-vX.X-mac-arm64.zip`을 받아 풀고, `MapleSkillMirror.app`을 응용 프로그램 폴더로 옮깁니다.
+2. 처음 열면 "확인되지 않은 개발자" 또는 "손상되어 열 수 없음"이 뜹니다. 서명 비용 때문에 개인 프로그램은 다 이렇습니다.
+   - **시스템 설정 › 개인정보 보호 및 보안** 맨 아래에 "MapleSkillMirror이(가) 차단됨" → **그래도 열기**.
+   - 그래도 안 되면 터미널에서: `xattr -cr /Applications/MapleSkillMirror.app`
+3. 처음 캡처할 때 **화면 기록 권한**을 물어봅니다. 허용하고 **앱을 다시 켜야** 합니다. 안 물어보면 시스템 설정 › 개인정보 보호 및 보안 › 화면 기록에서 직접 켜세요. 권한이 없으면 미러가 새까맣게 나옵니다.
+4. 설정은 `~/Library/Application Support/MapleSkillMirror/`에 저장됩니다.
+
+맥에서 다른 점: 칸 안쪽 클릭이 게임으로 통과되지 않습니다(편집 끝을 누르면 칸이 사라지므로 플레이엔 영향 없음). 캐릭터 창은 네모입니다(동그랗게가 안 됨). 인텔 맥용은 아직 없습니다.
 
 ## 처음 설정 (마법사가 안내합니다)
 
@@ -43,9 +54,16 @@
 
 Python 3.12 이상.
 
+**윈도우**
 ```
 build.bat
 ```
-
 처음 실행하면 `.venv`를 만들고 라이브러리를 설치한 뒤 `MapleSkillMirror\` 폴더에 exe를 만듭니다.
 exe 없이 바로 실행하려면 `run.bat`.
+
+**맥** (터미널)
+```
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/pyinstaller --noconfirm --onedir --windowed --name MapleSkillMirror --add-data "assets:assets" app.py
+```
+`dist/MapleSkillMirror.app`이 만들어집니다. 배포용 맥 zip은 GitHub Actions(`build-mac`)가 만듭니다.
