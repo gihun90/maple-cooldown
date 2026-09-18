@@ -13,8 +13,9 @@ import ctypes.wintypes
 import json
 import sys
 import time
+import traceback
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from pathlib import Path
 
 import mss
@@ -29,6 +30,25 @@ except Exception:
 # exe로 묶였을 때도 설정 파일은 exe 옆에 둔다
 BASE_DIR = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
 CONFIG_PATH = BASE_DIR / "config.json"
+LOG_PATH = BASE_DIR / "log.txt"
+
+
+def log(msg):
+    """오류를 exe 옆 log.txt에 남긴다. 다른 PC에서 문제가 나면 이 파일을 받아 본다."""
+    try:
+        with LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(time.strftime("[%Y-%m-%d %H:%M:%S] ") + msg + "\n")
+    except Exception:
+        pass
+
+
+def report_error(title, exc):
+    text = "".join(traceback.format_exception(exc))
+    log(f"{title}\n{text}")
+    try:
+        messagebox.showerror("메이플 스킬바 미러 - 오류", f"{title}\n\n{text}\n\n같은 폴더의 log.txt를 보내주세요.")
+    except Exception:
+        pass
 
 DEFAULTS = {
     "boxes": [],           # [{"left", "top", "size"}, ...] 화면 좌표. 칸 안쪽(캡처 영역)만 저장
@@ -112,6 +132,19 @@ def load_config():
 
 def save_config(cfg):
     CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def clamp_to_screen(x, y, w=200, h=100):
+    """창 위치가 어느 모니터에도 안 들어가면 주 모니터 안으로 끌어온다.
+    (모니터 수·해상도가 다른 PC에서 저장된 위치를 그대로 쓰면 화면 밖에 뜰 수 있다)"""
+    with mss.MSS() as sct:
+        mons = sct.monitors[1:]
+    px, py = x + 40, y + 10   # 창 왼쪽 위에서 조금 안쪽 점. 모서리에 딱 붙은 창(x=-2 등)도 화면 안으로 본다
+    for m in mons:
+        if m["left"] <= px < m["left"] + m["width"] and m["top"] <= py < m["top"] + m["height"]:
+            return x, y
+    m = primary_monitor()
+    return m["left"] + 80, m["top"] + 80
 
 
 def primary_monitor():
@@ -226,8 +259,8 @@ class MirrorWindow:
         self.win = tk.Toplevel(root)
         self.win.overrideredirect(True)
         self.win.configure(bg="#111")
-        pos = cfg["mirror_pos"]
-        self.win.geometry(f"+{pos['x']}+{pos['y']}")
+        x, y = clamp_to_screen(cfg["mirror_pos"]["x"], cfg["mirror_pos"]["y"])
+        self.win.geometry(f"+{x}+{y}")
         self.label = tk.Label(self.win, bg="#111", fg="#888", bd=0, cursor="fleur",
                               text="  칸을 추가하세요  ", font=("Malgun Gothic", 11), padx=10, pady=10)
         self.label.pack()
@@ -287,8 +320,8 @@ class ControlPanel:
         self.win = tk.Toplevel(root)
         self.win.title("메이플 스킬바 미러")
         self.win.resizable(False, False)
-        pos = cfg["panel_pos"]
-        self.win.geometry(f"+{pos['x']}+{pos['y']}")
+        x, y = clamp_to_screen(cfg["panel_pos"]["x"], cfg["panel_pos"]["y"])
+        self.win.geometry(f"+{x}+{y}")
         self.win.protocol("WM_DELETE_WINDOW", self.quit)
         self.win.attributes("-topmost", bool(cfg["topmost"]))
 
@@ -529,7 +562,14 @@ class ControlPanel:
 def main():
     root = tk.Tk()
     root.withdraw()
-    ControlPanel(root, load_config())
+    # 버튼 누를 때 나는 오류도 조용히 사라지지 않고 log.txt에 남게
+    root.report_callback_exception = lambda et, ev, tb: log("callback\n" + "".join(traceback.format_exception(et, ev, tb)))
+    try:
+        ControlPanel(root, load_config())
+    except Exception as ex:
+        report_error("시작 중 오류가 났어요", ex)
+        root.destroy()
+        return
     root.mainloop()
 
 
