@@ -9,3 +9,4 @@ config.json
 nametag.png
 MapleSkillMirror/
 *.zip
+!assets/*.png
