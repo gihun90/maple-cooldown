@@ -46,6 +46,16 @@ LOG_PATH = BASE_DIR / "log.txt"
 TAG_PATH = BASE_DIR / "nametag.png"   # 캐릭터 이름표 표식 그림
 
 UI_FONT = ("Apple SD Gothic Neo", 12) if IS_MAC else ("Malgun Gothic", 11)
+# 마법사 예시 그림. PyInstaller로 묶이면 _internal(sys._MEIPASS) 안에 들어간다
+ASSETS_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).parent)) / "assets"
+
+
+def load_asset(name):
+    try:
+        return ImageTk.PhotoImage(Image.open(ASSETS_DIR / name))
+    except Exception as ex:
+        log(f"asset load fail {name}: {ex!r}")
+        return None
 
 
 def log(msg):
@@ -105,7 +115,7 @@ BORDER = 3                # 칸 테두리 두께. 캡처 영역 바깥에 그려
 ICON_GAP = 3              # 메이플 스킬 아이콘 사이 간격(픽셀). 2026-09-18 실제 화면에서 잼
 TRANSPARENT = "#ff00fe"   # 윈도우: 이 색은 창에서 뚫려 보이고 클릭도 통과된다
 COLOR_EDIT = "#00ff88"    # 스킬 칸 테두리
-COLOR_TAG = "#00ccff"     # 이름표 칸 테두리
+COLOR_TAG = "#ff33cc"     # 이름표 칸 테두리 (이름표 틀이 파란색이라 파란 테두리는 안 보인다)
 COLOR_WATCH = "#ff9900"   # 감시 칸 테두리
 
 
@@ -775,8 +785,11 @@ class Wizard:
         frm.pack(fill="both", expand=True)
         self.title_lbl = ttk.Label(frm, text="", font=(UI_FONT[0], 13, "bold"))
         self.title_lbl.pack(anchor="w")
-        self.text_lbl = ttk.Label(frm, text="", justify="left", wraplength=400)
-        self.text_lbl.pack(anchor="w", pady=(8, 10))
+        self.text_lbl = ttk.Label(frm, text="", justify="left", wraplength=420)
+        self.text_lbl.pack(anchor="w", pady=(8, 8))
+        self.pic_lbl = ttk.Label(frm)   # 예시 그림
+        self.pic_lbl.pack(anchor="w", pady=(0, 8))
+        self._pic = None
         self.body = ttk.Frame(frm)
         self.body.pack(fill="x")
         self.status_lbl = ttk.Label(frm, text="", foreground="#666")
@@ -793,11 +806,16 @@ class Wizard:
         self.tick()
 
     # ---- 단계 ----
+    def set_picture(self, name):
+        self._pic = load_asset(name) if name else None
+        self.pic_lbl.configure(image=self._pic or "")
+
     def show_step(self, i):
         self.step = i
         for w in self.body.winfo_children():
             w.destroy()
         p = self.p
+        self.set_picture({0: "wizard_skills.png", 1: "wizard_tag.png", 2: "wizard_watch.png"}.get(i))
         self.prev_btn.configure(state="normal" if i > 0 else "disabled")
         self.skip_btn.pack_forget()
         self.next_btn.configure(text="다음")
@@ -805,7 +823,7 @@ class Wizard:
             p.set_edit(True, kinds={"skills"})
             self.title_lbl.configure(text="1 / 3  스킬 칸 놓기")
             self.text_lbl.configure(text=(
-                "초록 네모를 보고 싶은 스킬 아이콘 위에 하나씩 올려주세요.\n"
+                "초록 네모를 보고 싶은 스킬 아이콘 위에 하나씩 올려주세요. 아래 그림처럼 아이콘에 딱 맞게.\n"
                 "• [칸 추가]를 누르면 마지막 칸 오른쪽에 하나 더 생겨요\n"
                 "• 네모의 테두리를 잡고 끌어서 옮기기\n"
                 "• 잘못 만든 건 테두리에서 오른쪽 클릭 → 삭제\n"
@@ -822,7 +840,7 @@ class Wizard:
             p.place_tag_box(edit_kinds={"tag"})
             self.title_lbl.configure(text="2 / 3  내 캐릭터 이름표")
             self.text_lbl.configure(text=(
-                "파란 네모를 내 캐릭터 발밑 이름표에 딱 맞춰 주세요.\n"
+                "분홍 네모를 내 캐릭터 발밑 이름표에 딱 맞춰 주세요. (아래 그림)\n"
                 "• 크기가 안 맞으면 아래 숫자로 조절\n"
                 "• 캐릭터가 가만히 서 있을 때 [이름표 저장]을 누르세요 (움직이면 다른 게 찍혀요)\n"
                 "• 저장되면 캐릭터가 따로 작은 창에 나와요. 필요 없으면 [건너뛰기]"))
@@ -838,7 +856,7 @@ class Wizard:
             p.place_watch_box(edit_kinds={"watch"})
             self.title_lbl.configure(text="3 / 3  멈춤 감시")
             self.text_lbl.configure(text=(
-                "주황 네모를 화면 맨 아래 경험치 숫자 위에 올려주세요.\n"
+                "주황 네모를 화면 맨 아래 경험치 숫자 위에 올려주세요. (아래 그림)\n"
                 "그 숫자가 몇 초 동안 안 바뀌면(사냥이 멈추면) 미러 창 테두리가 빨갛게 깜빡여요.\n"
                 "• 사냥 중에만 바뀌는 숫자면 뭐든 됩니다 (경험치, 콤보 수)\n"
                 "• 필요 없으면 [건너뛰기]"))
@@ -1098,7 +1116,7 @@ class ControlPanel:
                 self.watch_box = self._make_watch_box()
         self.edit_btn.configure(text="편집 끝" if on else "칸 편집")
         self.hint.configure(text=(
-            "편집 중: 초록 = 스킬, 파란 = 이름표, 주황 = 감시 · 테두리를 끌어 옮기기 · 스킬 칸은 오른쪽 클릭으로 삭제"
+            "편집 중: 초록 = 스킬, 분홍 = 이름표, 주황 = 감시 · 테두리를 끌어 옮기기 · 스킬 칸은 오른쪽 클릭으로 삭제"
             if on else "네모 위치를 바꾸려면 [칸 편집]"))
 
     def toggle_edit(self):
@@ -1241,7 +1259,7 @@ class ControlPanel:
     def save_tag(self):
         ch = self.cfg["char"]
         if not ch["tag"]:
-            messagebox.showinfo("이름표", "먼저 [이름표 칸 놓기]로 파란 칸을 이름표에 맞춰 주세요.")
+            messagebox.showinfo("이름표", "먼저 [이름표 칸 놓기]로 분홍 칸을 이름표에 맞춰 주세요.")
             return
         # 테두리 창이 캡처에 들어가지 않게 잠깐 숨긴다
         if self.tag_box:
